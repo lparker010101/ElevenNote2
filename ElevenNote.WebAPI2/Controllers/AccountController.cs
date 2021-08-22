@@ -16,6 +16,7 @@ using Microsoft.Owin.Security.OAuth;
 using ElevenNote.WebAPI2.Models;
 using ElevenNote.WebAPI2.Providers;
 using ElevenNote.WebAPI2.Results;
+using ElevenNote.Web;
 
 namespace ElevenNote.WebAPI2.Controllers
 {
@@ -336,7 +337,6 @@ namespace ElevenNote.WebAPI2.Controllers
             {
                 return GetErrorResult(result);
             }
-
             return Ok();
         }
 
