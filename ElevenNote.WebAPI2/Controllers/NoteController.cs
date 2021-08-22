@@ -21,6 +21,7 @@ namespace ElevenNote.WebAPI2.Controllers
             return Ok(notes);
         }
 
+        [HttpPost]
         public IHttpActionResult Post(NoteCreate note)
         {
             if (!ModelState.IsValid) // A ModelState represents a collection of name and value pairs that were submitted to the server during a POST.
@@ -33,6 +34,7 @@ namespace ElevenNote.WebAPI2.Controllers
 
             return Ok();
         }
+
         private NoteService CreateNoteService()
         {
             var userId = Guid.Parse(User.Identity.GetUserId());
@@ -46,6 +48,20 @@ namespace ElevenNote.WebAPI2.Controllers
             NoteService noteService = CreateNoteService();
             var note = noteService.GetNoteById(id);
             return Ok(note);
+        }
+
+        [HttpPut] // Put means to update.
+        public IHttpActionResult Put(NoteEdit note)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var service = CreateNoteService();
+
+            if (!service.UpdateNote(note))
+                return InternalServerError();
+
+            return Ok();
         }
     }
 }
