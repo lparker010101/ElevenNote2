@@ -1,12 +1,89 @@
 using System.Web.Http;
 using WebActivatorEx;
-using ElevenNote.WebAPI2;
 using Swashbuckle.Application;
+using System.Linq;
+using Swashbuckle.Swagger;
+using System.Collections.Generic;
+using System.Web.Http.Filters;
+using ElevenNote.WebAPI2;
+using System.Web.Http.Description;
 
 [assembly: PreApplicationStartMethod(typeof(SwaggerConfig), "Register")]
 
 namespace ElevenNote.WebAPI2
 {
+    /// <summary>
+    /// Documents filter for adding Authorization header in Swashbuckle / Swagger.
+    /// </summary>
+    public class AddAuthorizationHeaderParameterOperationFilter : IOperationFilter
+    {
+        public void Apply(Operation operation, SchemaRegistry schemaRegistry, ApiDescription apiDescription)
+        {
+            var filterPipeline = apiDescription.ActionDescriptor.GetFilterPipeline();
+            var isAuthorized = filterPipeline
+                .Select(filterInfo => filterInfo.Instance)
+                .Any(filter => filter is IAuthorizationFilter);
+
+            var allowAnonymous = apiDescription.ActionDescriptor.GetCustomAttributes<AllowAnonymousAttribute>().Any();
+            if (!isAuthorized || allowAnonymous) return;
+            if (operation.parameters == null) operation.parameters = new List<Parameter>();
+
+            operation.parameters.Add(new Parameter
+            {
+                name = "Authorization",
+                @in = "header",
+                description = "from / token endpoint",
+                required = true,
+                type = "string"
+            });
+        }
+    }
+
+    /// <summary>
+    /// Document filter for adding OAuthToken endpoint documentation in Swashbuckle / Swagger.
+    /// Swagger normally won't find it - the /token endpoint - due to it being programmatically generated.
+    /// </summary>
+    class AuthTokenEndpointOperation : IDocumentationFilter
+    {
+        public void Apply(SwaggerDocument swaggerDoc, SchemaRegistry schemaRegistry, IApiExplorer apiExplorer)
+        {
+            swaggerDoc.paths.Add("/token", new PathItem
+            {
+                post = new Operation
+                {
+                    tags = new List<string> { "Auth" },
+                    consumes = new List<string>
+                    {
+                        "application/x-www-form-urlencoded"
+                    },
+                    parameters = new List<Parameter> {
+                        new Parameter
+                        {
+                            type = "string",
+                            name = "grant_type",
+                            required = true,
+                            @in = "formData"
+                        },
+                        new Parameter
+                        {
+                            type = "string",
+                            name = "username",
+                            required = false,
+                            @in = "formData"
+                        },
+                        new Parameter
+                        {
+                            type = "string",
+                            name = "password",
+                            required = false,
+                            @in = "formData"
+                        }
+                    }
+                }
+            });
+        }
+    }
+
     public class SwaggerConfig
     {
         public static void Register()
@@ -14,6 +91,7 @@ namespace ElevenNote.WebAPI2
             var thisAssembly = typeof(SwaggerConfig).Assembly;
 
             GlobalConfiguration.Configuration
+   
                 .EnableSwagger(c =>
                     {
                         // By default, the service root url is inferred from the request used to access the docs.
@@ -34,9 +112,17 @@ namespace ElevenNote.WebAPI2
                         //
                         c.SingleApiVersion("v1", "ElevenNote.WebAPI2");
 
+                        //Enable adding the Authorization header to [Authorize]d endpoints.
+
+                        c.OperationFilter(() => new AddAuthorizationHeaderParameterOperationFilter());
+
+                        //Show the programmatically generated /token endpoint in the UI.
+
+                        //c.DocumentFilter<AuthTokenEndpointOperation>();
+                         
                         // If you want the output Swagger docs to be indented properly, enable the "PrettyPrint" option.
                         //
-                        //c.PrettyPrint();
+                        c.PrettyPrint();
 
                         // If your API has multiple versions, use "MultipleApiVersions" instead of "SingleApiVersion".
                         // In this case, you must provide a lambda that tells Swashbuckle which actions should be
